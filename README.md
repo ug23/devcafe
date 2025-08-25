@@ -1,6 +1,7 @@
-# AWS EC2 Spot Instance Development Environment
+# devcafe
 
-セキュアで自動管理されるAWS EC2スポットインスタンス開発環境をTerraformにより構築するプロジェクトです。公開GitHubリポジトリでの管理を前提に、セキュリティを最優先に設計されています。
+AWS EC2スポットインスタンス開発環境をサッと立ち上げるプロジェクトです。
+「気分転換にスタバで開発したいけどdocker buildすると辛いよね」の解消のためです。
 
 ## 概要
 
