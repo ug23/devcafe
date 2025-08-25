@@ -1,23 +1,24 @@
 # AWS EC2 Spot Instance Development Environment
 
-セキュアで自動管理されるAWS EC2スポットインスタンス開発環境をTerraformで構築するプロジェクトです。公開GitHubリポジトリでの管理を前提に、セキュリティを最優先に設計されています。
+セキュアで自動管理されるAWS EC2スポットインスタンス開発環境をTerraformにより構築するプロジェクトです。公開GitHubリポジトリでの管理を前提に、セキュリティを最優先に設計されています。
 
-## 📋 概要
+## 概要
 
 このプロジェクトは、コスト効率の高いEC2スポットインスタンスを使用して、一時的な開発環境を簡単に構築・管理できるTerraform構成を提供します。
 
 ### 主な機能
 
-- 🚀 **c7g.4xlarge** (ARM Graviton3) スポットインスタンスの自動プロビジョニング
-- 🐳 **Docker & Docker Compose** の自動インストール
-- 🔐 **GitHub認証** の自動設定とリポジトリクローン
-- ⏰ **自動削除機能** - 指定時間後に自動的にリソースを削除（デフォルト4時間）
-- 🖥️ **IntelliJ Gateway** 対応 - リモート開発環境として利用可能
-- 🔒 **セキュリティ重視** - 機密情報の安全な管理
+- c7g.4xlarge (ARM Graviton3) スポットインスタンスの自動プロビジョニング
+- SSM接続によるSSHキー不要の安全な接続（カフェなどからでも接続可能）
+- Docker & Docker Composeの自動インストール
+- GitHub認証の自動設定とリポジトリクローン
+- 指定時間後の自動削除機能（デフォルト4時間）
+- IntelliJ Gateway対応（SSMポートフォワーディング経由）
+- セキュリティグループ不要、機密情報の安全な管理
 
-## 🔧 前提条件
+## 前提条件
 
-以下のツールがローカル環境にインストールされている必要があります：
+以下のツールがローカル環境にインストールされている必要があります。
 
 1. **Terraform** (v1.0以上)
    ```bash
@@ -34,12 +35,20 @@
    brew install jq  # macOS
    ```
 
-4. **AWS アカウント設定**
-   - AWSアカウントとIAMユーザー
-   - EC2、VPC、Lambda等の必要な権限
-   - 東京リージョン（ap-northeast-1）にSSHキーペアを作成済み
+4. **AWS Session Manager Plugin** （SSM接続用）
+   ```bash
+   brew install --cask session-manager-plugin  # macOS
+   # または https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html
+   ```
 
-## 🚀 クイックスタート
+5. **AWS アカウント設定**
+   - AWSアカウントとIAMユーザー
+   - EC2、VPC、Lambda、SSM等の必要な権限
+   - **SSHキーペアは不要** (SSM接続を使用)
+
+※ Ubuntu 22.04 ARMにはSSMエージェントがプリインストールされています。
+
+## クイックスタート
 
 ### 1. リポジトリのクローン
 ```bash
@@ -53,10 +62,12 @@ cp .env.example .env
 cp terraform.tfvars.example terraform.tfvars
 ```
 
-### 3. 必須設定の編集
-`.env`ファイルを編集し、最低限以下を設定：
+### 3. 設定（オプション）
+SSM接続のため**必須設定はありません**。GitHub連携を利用する場合のみ`.env`を編集します。
 ```bash
-TF_VAR_ssh_key_name=your-aws-key-name  # AWSに登録済みのSSHキー名（必須）
+TF_VAR_github_pat=ghp_xxxxxxxxxxxxxxxxxxxx  # GitHub Personal Access Token
+TF_VAR_github_username=your-username
+TF_VAR_github_repo_url=https://github.com/username/repo.git
 ```
 
 ### 4. 環境の起動
@@ -65,16 +76,21 @@ TF_VAR_ssh_key_name=your-aws-key-name  # AWSに登録済みのSSHキー名（必
 ```
 
 ### 5. インスタンスへの接続
-起動完了後、表示されるSSHコマンドで接続：
+起動完了後、SSM経由で接続します。
 ```bash
-ssh -i ~/.ssh/your-key.pem ubuntu@<public-ip>
+./scripts/connect.sh
 ```
 
-## 📝 詳細設定
+※ SSMセッションはrootユーザーで開始されるため、`ubuntu`ユーザーに切り替えます。
+```bash
+sudo su - ubuntu
+```
+
+## 詳細設定
 
 ### AWS認証設定
 
-以下のいずれかの方法でAWS認証を設定してください：
+以下のいずれかの方法でAWS認証を設定してください。
 
 #### 方法1: AWS CLIの設定（推奨）
 ```bash
@@ -86,7 +102,7 @@ aws configure
 ```
 
 #### 方法2: 環境変数の設定
-`.env`ファイルに追加：
+`.env`ファイルに追加します。
 ```bash
 AWS_ACCESS_KEY_ID=your_access_key
 AWS_SECRET_ACCESS_KEY=your_secret_key
@@ -95,7 +111,7 @@ AWS_DEFAULT_REGION=ap-northeast-1
 
 ### GitHub Personal Access Token (PAT) の設定
 
-GitHubリポジトリの自動クローンを利用する場合：
+GitHubリポジトリの自動クローンを利用する場合の手順です。
 
 1. [GitHub Settings > Developer settings > Personal access tokens](https://github.com/settings/tokens) にアクセス
 2. "Generate new token (classic)" をクリック
@@ -110,22 +126,19 @@ TF_VAR_github_email=your-email@example.com
 TF_VAR_github_repo_url=https://github.com/username/repo.git
 ```
 
-### SSH鍵の設定
+### SSM接続の仕組み
 
-1. AWS EC2コンソールで鍵ペアを作成（まだの場合）
-2. ダウンロードした`.pem`ファイルを`~/.ssh/`に配置
-3. 権限を設定：
-```bash
-chmod 400 ~/.ssh/your-key.pem
-```
-4. `.env`ファイルにキー名を設定（拡張子なし）：
-```bash
-TF_VAR_ssh_key_name=your-key-name
-```
+**SSHキーは不要です！**
+
+SSM (Systems Manager Session Manager) を使用して安全に接続します。
+- IAMロールベースの認証
+- セキュリティグループでのポート開放不要
+- 公開IPアドレスへの直接アクセス不要
+- カフェなどのIPが変わる場所からでも接続可能
 
 ### カスタマイズ可能な設定
 
-`terraform.tfvars`または`.env`で以下の設定をカスタマイズできます：
+`terraform.tfvars`または`.env`で以下の設定をカスタマイズできます。
 
 | 変数名 | デフォルト値 | 説明 |
 |--------|------------|------|
@@ -134,9 +147,9 @@ TF_VAR_ssh_key_name=your-key-name
 | `spot_max_price` | `""` | スポット価格上限（空の場合オンデマンド価格） |
 | `root_volume_size` | `100` | ルートボリュームサイズ（GB） |
 | `auto_terminate_hours` | `4` | 自動削除までの時間（1-24時間） |
-| `enable_jetbrains_gateway` | `true` | JetBrains Gateway用ポート開放 |
+| `enable_jetbrains_gateway` | `true` | JetBrains Gateway用設定 (現在はSSMポートフォワーディングを使用) |
 
-## 🎮 使用方法
+## 使用方法
 
 ### 環境の起動
 ```bash
@@ -148,24 +161,43 @@ TF_VAR_ssh_key_name=your-key-name
 
 ### 環境への接続
 
-#### SSH接続
+#### SSM接続
 ```bash
-ssh -i ~/.ssh/your-key.pem ubuntu@<public-ip>
+# コンソール接続
+./scripts/connect.sh
+
+# ubuntuユーザーに切り替え
+sudo su - ubuntu
+```
+
+#### ポートフォワーディング（SSHクライアント用）
+```bash
+# SSHポートをローカルに転送（バックグラウンド実行）
+./scripts/port-forward.sh 2222 22
+
+# ローカルからSSH接続
+ssh -p 2222 ubuntu@localhost
+
+# ポートフォワーディングを停止
+./scripts/stop-forward.sh
 ```
 
 #### IntelliJ Gateway接続
-1. IntelliJ IDEAでGatewayを開く
-2. "New Connection"を選択
-3. 以下の情報を入力：
+1. ポートフォワーディングを開始：
+   ```bash
+   ./scripts/port-forward.sh 2222 22
+   ```
+2. IntelliJ IDEAでGatewayを開く
+3. "New Connection"を選択
+4. 以下の情報を入力：
    - Connection Type: SSH
-   - Host: 表示されたPublic IP
-   - Port: 22
+   - Host: **localhost**
+   - Port: **2222**
    - Username: ubuntu
-   - Authentication: Key pair
-   - Private key: `~/.ssh/your-key.pem`のパス
+   - Authentication: Password/Key (任意)
 
 ### 自動削除時間の延長
-デフォルトでは4時間後に自動削除されます。延長する場合：
+デフォルトでは4時間後に自動削除されます。延長する場合は次のコマンドを実行します。
 ```bash
 ./scripts/extend.sh 2  # 2時間延長
 ```
@@ -174,21 +206,21 @@ ssh -i ~/.ssh/your-key.pem ubuntu@<public-ip>
 ```bash
 ./scripts/stop.sh
 ```
-すべてのリソースが完全に削除されます。
+すべてのリソースが削除されます。
 
-## 💰 コスト見積もり
+## コスト見積もり
 
-c7g.4xlarge (東京リージョン) の参考価格：
-- **オンデマンド**: 約$0.5-0.6/時間
-- **スポット**: 約$0.15-0.25/時間（70%程度の削減）
+c7g.4xlarge (東京リージョン) の参考価格は以下のとおりです。
+- オンデマンドは約$0.5-0.6/時間
+- スポットは約$0.15-0.25/時間（70%程度の削減）
 
-月間使用例（1日8時間、週5日）：
-- オンデマンド: 約$80-100
-- スポット: 約$25-40
+月間使用例（1日8時間、週5日）
+- オンデマンドは約$80-100
+- スポットは約$25-40
 
-**注意**: 実際の価格は市場状況により変動します。最新の価格は[AWS EC2 Pricing](https://aws.amazon.com/ec2/pricing/on-demand/)を確認してください。
+実際の価格は市場状況により変動します。最新の価格は[AWS EC2 Pricing](https://aws.amazon.com/ec2/pricing/on-demand/)を確認してください。
 
-## 🔧 トラブルシューティング
+## トラブルシューティング
 
 ### スポットリクエストが満たされない
 ```bash
@@ -199,11 +231,12 @@ Error: waiting for EC2 Spot Instance Request to be fulfilled
 - `spot_max_price`を調整する
 - オンデマンドインスタンスに切り替える
 
-### SSH接続できない
+### SSM接続できない
 **確認事項**:
-1. セキュリティグループが現在のIPを許可しているか
-2. SSHキーの権限が正しいか（400）
+1. Session Manager Pluginがインストールされているか
+2. AWS CLIの認証が正しく設定されているか
 3. インスタンスが起動完了しているか
+4. SSMエージェントが正常に動作しているか（`setup.sh`のログを確認）
 
 ### 自動削除が機能しない
 **確認事項**:
@@ -217,11 +250,11 @@ Error: waiting for EC2 Spot Instance Request to be fulfilled
 2. 必要なスコープが付与されているか
 3. リポジトリURLが正しいか
 
-## 🔒 セキュリティ注意事項
+## セキュリティ注意事項
 
 ### 絶対に公開してはいけないファイル
 
-以下のファイルは`.gitignore`に含まれており、**絶対にコミットしないでください**：
+以下のファイルは`.gitignore`に含まれており、コミットしないように注意してください。
 
 - `.env` - 環境変数（PAT、認証情報を含む）
 - `terraform.tfvars` - Terraform変数（機密情報を含む）
@@ -242,17 +275,17 @@ Error: waiting for EC2 Spot Instance Request to be fulfilled
    - MFAを有効化
    - アクセスキーの定期的なローテーション
 
-3. **SSH鍵**
-   - Ed25519またはRSA 4096ビット以上を使用
-   - パスフレーズで保護
-   - 定期的に更新
+3. **SSM接続のメリット**
+   - SSHキーの管理不要
+   - セキュリティグループでのポート開放不要
+   - セッションの監査ログがCloudTrailに記録
 
 4. **ネットワークセキュリティ**
-   - セキュリティグループは自分のIPのみ許可
-   - 不要なポートは開放しない
+   - セキュリティグループはアウトバウンドのみ許可
+   - インバウンドポートはすべてブロック
    - VPCとサブネットを適切に設定
 
-## 📂 プロジェクト構造
+## プロジェクト構造
 
 ```
 aws-spot-dev-env/
@@ -263,29 +296,29 @@ aws-spot-dev-env/
 ├── scripts/
 │   ├── start.sh            # 環境起動スクリプト
 │   ├── stop.sh             # 環境削除スクリプト
-│   └── extend.sh           # 自動削除延長スクリプト
+│   ├── extend.sh           # 自動削除延長スクリプト
+│   ├── connect.sh          # SSM接続スクリプト
+│   ├── port-forward.sh     # ポートフォワーディング開始
+│   └── stop-forward.sh     # ポートフォワーディング停止
 ├── .gitignore              # Git除外設定
 ├── terraform.tfvars.example # Terraform変数サンプル
 ├── .env.example            # 環境変数サンプル
 └── README.md               # このファイル
 ```
 
-## 🤝 貢献
+## 貢献
 
 プルリクエストを歓迎します。大きな変更の場合は、まずissueを開いて変更内容を議論してください。
 
-## 📄 ライセンス
+## ライセンス
 
 [MIT License](LICENSE)
 
-## 🙏 謝辞
+## 謝辞
 
-このプロジェクトは以下の技術を使用しています：
+このプロジェクトは以下の技術を使用しています。
 - [Terraform](https://www.terraform.io/)
 - [AWS](https://aws.amazon.com/)
 - [Docker](https://www.docker.com/)
 - [Ubuntu](https://ubuntu.com/)
 
-## 📞 サポート
-
-問題が発生した場合は、[Issues](https://github.com/your-username/your-repo/issues)でお知らせください。
