@@ -1,0 +1,28 @@
+# AWS Spot Development Environment Configuration
+# Copy this file to terraform.tfvars and fill in your values
+
+# Project Configuration
+project_name = "my-dev-env"  # Change this to your project name
+aws_region   = "ap-northeast-1"  # Tokyo region
+
+# Instance Configuration
+instance_type    = "c7g.4xlarge"  # ARM Graviton3 instance
+spot_max_price   = ""  # Leave empty for on-demand price, or set like "0.5"
+root_volume_size = 100  # GB
+
+# SSH Configuration (REQUIRED)
+ssh_key_name = "your-aws-key-name"  # Name of your SSH key pair in AWS (without .pem)
+
+# GitHub Configuration (Optional but recommended)
+# Create a Personal Access Token at: https://github.com/settings/tokens
+# Required scopes: repo (for private repos) or public_repo (for public repos)
+github_pat      = ""  # Your GitHub Personal Access Token
+github_username = ""  # Your GitHub username
+github_email    = ""  # Your GitHub email for git config
+github_repo_url = ""  # Repository to auto-clone (e.g., "https://github.com/username/repo.git")
+
+# Auto-termination Configuration
+auto_terminate_hours = 4  # Hours before auto-termination (1-24)
+
+# JetBrains Gateway Configuration
+enable_jetbrains_gateway = true  # Enable additional ports for JetBrains Remote Development
