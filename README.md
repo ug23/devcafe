@@ -53,7 +53,7 @@
 ### 1. リポジトリのクローン
 ```bash
 git clone <your-repository-url>
-cd aws-spot-dev-env
+cd <repository-name>
 ```
 
 ### 2. 設定ファイルの準備
@@ -288,7 +288,7 @@ Error: waiting for EC2 Spot Instance Request to be fulfilled
 ## プロジェクト構造
 
 ```
-aws-spot-dev-env/
+./
 ├── main.tf                 # Terraformメイン設定
 ├── variables.tf            # 変数定義
 ├── outputs.tf              # 出力定義
