@@ -10,8 +10,8 @@ instance_type    = "c7g.4xlarge"  # ARM Graviton3 instance
 spot_max_price   = ""  # Leave empty for on-demand price, or set like "0.5"
 root_volume_size = 100  # GB
 
-# SSH Configuration (REQUIRED)
-ssh_key_name = "your-aws-key-name"  # Name of your SSH key pair in AWS (without .pem)
+# SSH Configuration (Optional - not needed for SSM connection)
+# ssh_key_name = "your-aws-key-name"  # Only if you want SSH access in addition to SSM
 
 # GitHub Configuration (Optional but recommended)
 # Create a Personal Access Token at: https://github.com/settings/tokens

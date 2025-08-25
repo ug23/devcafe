@@ -44,6 +44,26 @@ sudo apt-get install -y \
     tmux \
     python3-pip
 
+# Verify SSM Agent (should be pre-installed on Ubuntu 22.04 ARM)
+echo "Checking SSM Agent status..."
+if systemctl is-active --quiet amazon-ssm-agent; then
+    echo "SSM Agent is running"
+    systemctl status amazon-ssm-agent --no-pager || true
+else
+    echo "Warning: SSM Agent is not running. Attempting to start..."
+    sudo systemctl start amazon-ssm-agent || {
+        echo "Error: Failed to start SSM Agent"
+        echo "Manual installation may be required"
+    }
+fi
+
+# Verify IAM role attachment
+echo "Checking IAM instance profile..."
+curl -s http://169.254.169.254/latest/meta-data/iam/info | jq . || {
+    echo "Warning: Unable to verify IAM instance profile"
+    echo "SSM connection may not work without proper IAM role"
+}
+
 # Install Docker
 echo "Installing Docker..."
 curl -fsSL https://get.docker.com -o get-docker.sh

@@ -29,9 +29,10 @@ variable "root_volume_size" {
 }
 
 variable "ssh_key_name" {
-  description = "Name of the SSH key pair in AWS"
+  description = "Name of the SSH key pair in AWS (optional - not needed for SSM)"
   type        = string
   sensitive   = true
+  default     = ""
 }
 
 variable "github_pat" {

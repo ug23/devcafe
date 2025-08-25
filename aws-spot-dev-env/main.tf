@@ -12,12 +12,7 @@ provider "aws" {
   region = var.aws_region
 }
 
-data "http" "my_ip" {
-  url = "https://checkip.amazonaws.com"
-}
-
 locals {
-  my_ip = chomp(data.http.my_ip.response_body)
   common_tags = {
     Environment     = "development"
     ManagedBy      = "terraform"
@@ -100,29 +95,11 @@ resource "aws_route_table_association" "main" {
 
 resource "aws_security_group" "main" {
   name        = "${var.project_name}-sg"
-  description = "Security group for development spot instance"
+  description = "Security group for development spot instance with SSM"
   vpc_id      = aws_vpc.main.id
 
-  ingress {
-    description = "SSH from my IP"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["${local.my_ip}/32"]
-  }
-
-  # JetBrains Gateway用のポート範囲
-  dynamic "ingress" {
-    for_each = var.enable_jetbrains_gateway ? [1] : []
-    content {
-      description = "JetBrains Gateway ports"
-      from_port   = 5900
-      to_port     = 5999
-      protocol    = "tcp"
-      cidr_blocks = ["${local.my_ip}/32"]
-    }
-  }
-
+  # SSM接続のためにはインバウンドルールは不要
+  # すべてのアウトバウンド通信を許可（SSMエンドポイントへの接続用）
   egress {
     description = "Allow all outbound traffic"
     from_port   = 0
@@ -134,6 +111,40 @@ resource "aws_security_group" "main" {
   tags = merge(local.common_tags, {
     Name = "${var.project_name}-sg"
   })
+}
+
+# EC2インスタンス用のIAMロール（SSM接続用）
+resource "aws_iam_role" "ec2_role" {
+  name = "${var.project_name}-ec2-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+      }
+    ]
+  })
+
+  tags = local.common_tags
+}
+
+# SSM接続に必要なマネージドポリシーをアタッチ
+resource "aws_iam_role_policy_attachment" "ssm_managed_instance_core" {
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+# インスタンスプロファイル
+resource "aws_iam_instance_profile" "ec2_profile" {
+  name = "${var.project_name}-ec2-profile"
+  role = aws_iam_role.ec2_role.name
+
+  tags = local.common_tags
 }
 
 data "template_file" "user_data" {
@@ -152,7 +163,7 @@ data "template_file" "user_data" {
 resource "aws_spot_instance_request" "dev" {
   ami                    = data.aws_ami.ubuntu_arm.id
   instance_type          = var.instance_type
-  key_name              = var.ssh_key_name
+  iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
   vpc_security_group_ids = [aws_security_group.main.id]
   subnet_id             = aws_subnet.main.id
   user_data             = data.template_file.user_data.rendered

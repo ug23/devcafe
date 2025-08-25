@@ -18,26 +18,8 @@ else
     echo "Warning: .env file not found. Using environment variables."
 fi
 
-# Validate required environment variables
-REQUIRED_VARS=(
-    "TF_VAR_ssh_key_name"
-)
-
-MISSING_VARS=()
-for var in "${REQUIRED_VARS[@]}"; do
-    if [ -z "${!var}" ]; then
-        MISSING_VARS+=($var)
-    fi
-done
-
-if [ ${#MISSING_VARS[@]} -ne 0 ]; then
-    echo "Error: Missing required environment variables:"
-    printf ' - %s\n' "${MISSING_VARS[@]}"
-    echo ""
-    echo "Please set these variables in your .env file or environment."
-    echo "See .env.example for reference."
-    exit 1
-fi
+# No required environment variables for SSM connection
+# SSH key is now optional
 
 # Optional but recommended variables check
 OPTIONAL_VARS=(

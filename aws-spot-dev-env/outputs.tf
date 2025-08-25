@@ -3,29 +3,25 @@ output "instance_id" {
   value       = aws_spot_instance_request.dev.spot_instance_id
 }
 
-output "public_ip" {
-  description = "Public IP address of the instance"
-  value       = aws_spot_instance_request.dev.public_ip
+output "ssm_connect_command" {
+  description = "SSM command to connect to the instance"
+  value       = "./scripts/connect.sh"
 }
 
-output "public_dns" {
-  description = "Public DNS name of the instance"
-  value       = aws_spot_instance_request.dev.public_dns
-}
-
-output "ssh_command" {
-  description = "SSH command to connect to the instance"
-  value       = "ssh -i ~/.ssh/${var.ssh_key_name}.pem ubuntu@${aws_spot_instance_request.dev.public_ip}"
+output "ssm_port_forward_command" {
+  description = "SSM port forwarding command for IntelliJ Gateway"
+  value       = "./scripts/port-forward.sh"
 }
 
 output "jetbrains_gateway_config" {
-  description = "JetBrains Gateway connection information"
-  value = var.enable_jetbrains_gateway ? {
-    host     = aws_spot_instance_request.dev.public_ip
-    port     = 22
-    username = "ubuntu"
-    key_path = "~/.ssh/${var.ssh_key_name}.pem"
-  } : null
+  description = "JetBrains Gateway connection information (after port forwarding)"
+  value = {
+    setup_command = "./scripts/port-forward.sh 2222 22"
+    host          = "localhost"
+    port          = 2222
+    username      = "ubuntu"
+    note          = "Run port-forward.sh first to establish connection"
+  }
 }
 
 output "auto_terminate_time" {

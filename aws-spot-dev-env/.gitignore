@@ -49,6 +49,11 @@ logs/
 # Lambda package
 lambda_terminate.zip
 
+# Port forwarding files
+.port-forward.pid
+.port-forward.info
+.port-forward.log
+
 # Backup files
 *.backup
 *.bak
