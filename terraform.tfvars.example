@@ -22,7 +22,7 @@ github_email    = ""  # Your GitHub email for git config
 github_repo_url = ""  # Repository to auto-clone (e.g., "https://github.com/username/repo.git")
 
 # Auto-termination Configuration
-auto_terminate_hours = 4  # Hours before auto-termination (1-24)
+auto_terminate_hours = 2  # Hours before auto-termination (1-24)
 
 # JetBrains Gateway Configuration
 enable_jetbrains_gateway = true  # Enable additional ports for JetBrains Remote Development

@@ -63,7 +63,7 @@ variable "github_repo_url" {
 variable "auto_terminate_hours" {
   description = "Hours before auto-termination"
   type        = number
-  default     = 4
+  default     = 2
   
   validation {
     condition     = var.auto_terminate_hours >= 1 && var.auto_terminate_hours <= 24
